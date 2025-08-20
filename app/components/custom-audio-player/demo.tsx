@@ -8,7 +8,7 @@ import ProfessionalAudioPlayer from "./professional";
 import SmoothAudioPlayer from "./smooth";
 import UltraSmoothAudioPlayer from "./ultra-smooth";
 import ScreenshotMatchAudioPlayer from "./screenshot-match";
-import Figma from "./figma"
+import CustomAudioPlayerBeautiful from "./custom-audio-player-beautiful"
 
 interface AudioPlayerDemoProps {
   audioUrl?: string;
@@ -63,7 +63,7 @@ export const AudioPlayerDemo: React.FC<AudioPlayerDemoProps> = ({
           <p className="text-gray-600 mb-6">
             特点：上下对称设计，呼吸式动画效果，优化的视觉体验
           </p>
-          <Figma
+          <CustomAudioPlayerBeautiful
             src={audioUrl}
             autoPlay={false}
             loop={false}

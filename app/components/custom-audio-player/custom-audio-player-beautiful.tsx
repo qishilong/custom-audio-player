@@ -11,6 +11,8 @@ interface UltraSmoothAudioPlayerProps {
   showDownload?: boolean;
   onTimeUpdate?: (currentTime: number, duration: number) => void;
   onEnded?: () => void;
+  handleLoadedMetadata?: (e?: any) => void
+  handleError?: (e: any) => void
 }
 
 interface SymmetricWaveBarProps {
@@ -32,7 +34,6 @@ const SymmetricWaveBar: FC<SymmetricWaveBarProps> = ({
   barIndex,
   animationPhase,
   exactProgress,
-  totalBars
 }) => {
   // 计算当前柱子的播放状态
   const barProgress = exactProgress - barIndex;
@@ -55,32 +56,32 @@ const SymmetricWaveBar: FC<SymmetricWaveBarProps> = ({
   // 动态颜色计算
   const getBarColor = useCallback(() => {
     if (isPassed) {
-      return "bg-gradient-to-t from-cyan-500 via-cyan-400 to-cyan-300";
+      return "bg-gradient-to-t from-cyan-500 via-cyan-400 to-[#44B4FF]";
     } else if (isPartiallyPassed) {
-      return "bg-gradient-to-t from-cyan-500 via-cyan-400 to-cyan-300";
+      return "bg-gradient-to-t from-cyan-500 via-cyan-400 to-[#44B4FF]";
     } else {
       return "bg-gradient-to-t from-white/30 via-white/20 to-white/10";
     }
   }, [isPassed, isPartiallyPassed]);
 
   return (
-    <div className='h-full w-full flex items-center justify-center relative bg-black'>
+    <div className='h-full w-full flex items-center justify-center relative bg-white'>
       <div
-        className={cn('w-full rounded-t-full origin-bottom transition-colors duration-100 ease-out',
+        className={cn('w-full rounded-t-full origin-bottom transition-colors duration-100 ease-out cursor-pointer',
           getBarColor(),
-          isActive && "shadow-lg shadow-cyan-400/30",
+          isActive && "shadow-lg bg-[#44B4FF]",
         )}
         style={{
-          height: `${animatedHeight}%`,
+          height: '100%',
           transition: 'height 0.1s ease-out, transform 0.1s ease-out',
           opacity: isPassed ? 1 : (isPartiallyPassed ? partialOpacity : 0.3),
         }}
       />
       {/* 当前播放位置的微光效果 */}
       {isActive && (
-        <div className="absolute inset-0 pointer-events-none">
+        <div className="absolute inset-0 h-[140%] translate-y-[-20%] pointer-events-none">
           <div
-            className="w-full h-full bg-cyan-400/10 rounded-full"
+            className="w-full h-full bg-[rgba(68,180,255,0.5)] rounded-full"
             style={{
               animation: isPlaying ? 'pulse 2s ease-in-out infinite' : 'none',
             }}
@@ -92,7 +93,7 @@ const SymmetricWaveBar: FC<SymmetricWaveBarProps> = ({
 
 }
 
-const Figma: FC<UltraSmoothAudioPlayerProps> = ({
+const CustomAudioPlayerBeautiful: FC<UltraSmoothAudioPlayerProps> = ({
   src,
   className,
   autoPlay = false,
@@ -100,12 +101,15 @@ const Figma: FC<UltraSmoothAudioPlayerProps> = ({
   showDownload = true,
   onTimeUpdate,
   onEnded,
+  handleLoadedMetadata,
+  handleError
 }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [animationPhase, setAnimationPhase] = useState(0);
+  const [loadError, handleLoadError] = useState(false);
 
   const waveformRef = useRef<HTMLDivElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -206,14 +210,18 @@ const Figma: FC<UltraSmoothAudioPlayerProps> = ({
   const { activeIndex, progress, exactProgress } = getPlaybackPosition();
 
   // 下载功能
-  const handleDownload = useCallback(async (src: string) => {
+  const handleDownload = useCallback(async (src: string, filename?: string) => {
     try {
       const response = await fetch(src);
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `audio_${Date.now()}.mp3`;
+      if (filename) {
+        link.download = filename;
+      } else {
+        link.download = `audio_${Date.now()}.mp3`;
+      }
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -316,6 +324,11 @@ const Figma: FC<UltraSmoothAudioPlayerProps> = ({
     };
   }, [onTimeUpdate, onEnded, loop]);
 
+
+  if (loadError) {
+    return null
+  }
+
   return (
     <>
       <div
@@ -354,7 +367,7 @@ const Figma: FC<UltraSmoothAudioPlayerProps> = ({
               <SymmetricWaveBar
                 key={bar.id}
                 height={bar.height}
-                isActive={index === activeIndex}
+                isActive={index === activeIndex && index !== 0}
                 isPassed={index < activeIndex}
                 isPlaying={isPlaying}
                 barIndex={index}
@@ -374,7 +387,7 @@ const Figma: FC<UltraSmoothAudioPlayerProps> = ({
               {formatTime(duration)}
             </span>
           </span>
-          <span
+          {showDownload && <span
             className={cn('w-[1.47rem] flex items-start justify-center cursor-pointer',
               { 'cursor-not-allowed': isLoading || !src }
             )}
@@ -385,12 +398,25 @@ const Figma: FC<UltraSmoothAudioPlayerProps> = ({
             }}
           >
             <DownloadIcon />
-          </span>
+          </span>}
         </div>
       </div>
-      <audio ref={audioRef} src={src} loop={loop} preload="metadata" />
+      <audio
+        ref={audioRef}
+        src={src}
+        loop={loop}
+        preload="metadata"
+        onLoadedMetadata={(e) => {
+          if (handleLoadedMetadata) {
+            handleLoadedMetadata(e)
+          }
+        }}
+        onError={(e) => {
+          handleLoadError(true)
+          handleError?.(e);
+        }}
+      />
     </>
-
   )
 }
 
@@ -422,4 +448,6 @@ const DownloadIcon = () => (<svg xmlns="http://www.w3.org/2000/svg" width="13" h
   <path d="M11.5673 12.8101C11.7434 12.8101 11.9123 12.88 12.0368 13.0045C12.1613 13.129 12.2312 13.2979 12.2312 13.474C12.2312 13.6501 12.1613 13.8189 12.0368 13.9434C11.9123 14.0679 11.7434 14.1379 11.5673 14.1379H0.945137C0.769063 14.1379 0.600201 14.0679 0.475698 13.9434C0.351195 13.8189 0.28125 13.6501 0.28125 13.474C0.28125 13.2979 0.351195 13.129 0.475698 13.0045C0.600201 12.88 0.769063 12.8101 0.945137 12.8101H11.5673ZM6.25623 0.862793C6.4323 0.862793 6.60116 0.932738 6.72567 1.05724C6.85017 1.18174 6.92012 1.35061 6.92012 1.52668V9.54576L10.1001 6.36575C10.2195 6.24646 10.3798 6.1771 10.5485 6.17177C10.7171 6.16644 10.8815 6.22554 11.0082 6.33706C11.1348 6.44858 11.2142 6.60414 11.2303 6.77213C11.2464 6.94012 11.1979 7.10791 11.0946 7.24141L11.0389 7.30382L6.72294 11.6224C6.60871 11.7368 6.45666 11.8056 6.29531 11.8159C6.13397 11.8261 5.97442 11.7772 5.84661 11.6782L5.78421 11.6231L1.47226 7.31842C1.35274 7.19918 1.28315 7.03887 1.27764 6.87013C1.27213 6.70138 1.33112 6.53688 1.4426 6.41009C1.55408 6.28329 1.70968 6.20374 1.87775 6.18761C2.04581 6.17148 2.2137 6.21999 2.34726 6.32326L2.40967 6.37836L5.59234 9.55439V1.52668C5.59234 1.35061 5.66229 1.18174 5.78679 1.05724C5.91129 0.932738 6.08015 0.862793 6.25623 0.862793Z" fill="white" />
 </svg>)
 
-export default Figma
+
+export default CustomAudioPlayerBeautiful
+
